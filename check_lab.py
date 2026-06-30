@@ -88,8 +88,11 @@ def main():
 
     # 6. Test suite
     print("\n[6] Test suite:")
+    pytest_cmd = "pytest"
+    if os.name == "nt" and os.path.exists(os.path.join(".venv", "Scripts", "pytest.exe")):
+        pytest_cmd = os.path.join(".venv", "Scripts", "pytest.exe")
     result = subprocess.run(
-        ["pytest", "tests/", "--tb=short", "-q"],
+        [pytest_cmd, "tests/", "--tb=short", "-q"],
         capture_output=True, text=True,
     )
     tests_ok = result.returncode == 0

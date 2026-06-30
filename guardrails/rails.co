@@ -88,3 +88,8 @@ define flow self check facts
   $facts = execute check_facts
   if not $facts.accurate
     bot say "Lưu ý: Câu trả lời trên có thể không chính xác. Vui lòng xác nhận với phòng Nhân sự."
+
+define flow generate response
+  user ...
+  $bot_response = execute generate_bot_response
+  bot $bot_response

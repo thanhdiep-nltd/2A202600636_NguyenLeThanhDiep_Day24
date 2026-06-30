@@ -75,6 +75,8 @@ def build_pipeline():
 
 
 def run_query(q: str, search, reranker, top_k: int) -> tuple[str, list[str]]:
+    import os
+    from openai import OpenAI
     from config import OPENAI_API_KEY
 
     results = search.search(q)
@@ -82,9 +84,29 @@ def run_query(q: str, search, reranker, top_k: int) -> tuple[str, list[str]]:
     reranked = reranker.rerank(q, docs, top_k=top_k)
     contexts = [r.text for r in reranked] if reranked else [r.text for r in results[:3]]
 
+    # Prefer DeepSeek if configured
+    ds_key = os.getenv("DEEPSEEK_API_KEY")
+    ds_base = os.getenv("DEEPSEEK_API_BASE")
+    ds_model = os.getenv("DEEPSEEK_MODEL_NAME")
+
+    if ds_key and contexts:
+        try:
+            client = OpenAI(api_key=ds_key, base_url=ds_base)
+            model = ds_model or "deepseek-chat"
+            ctx = "\n\n".join(contexts)
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "Trả lời CHỈ dựa trên context. Nếu không có → nói 'Không tìm thấy.'"},
+                    {"role": "user",   "content": f"Context:\n{ctx}\n\nCâu hỏi: {q}"},
+                ],
+            )
+            return resp.choices[0].message.content, contexts
+        except Exception as e:
+            print(f"  ⚠️  DeepSeek generation failed: {e}. Trying OpenAI fallback...")
+
     if OPENAI_API_KEY and contexts:
         try:
-            from openai import OpenAI
             client = OpenAI()
             ctx = "\n\n".join(contexts)
             resp = client.chat.completions.create(

@@ -2,6 +2,10 @@ models:
   - type: main
     engine: openai
     model: gpt-4o-mini
+  - type: embeddings
+    engine: openai
+    model: text-embedding-3-small
+
 
 instructions:
   - type: general
@@ -12,11 +16,9 @@ instructions:
       or any confidential data. If a question is outside your scope, politely decline.
 
 rails:
-  input:
-    flows:
-      - check jailbreak
-      - check off topic
-      - check pii request
+  dialog:
+    user_messages:
+      embeddings_only: true
   output:
     flows:
       - check sensitive output

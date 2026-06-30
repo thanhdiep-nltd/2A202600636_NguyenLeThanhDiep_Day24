@@ -1,7 +1,7 @@
 # CI/CD Blueprint: RAG Eval + Guardrail Stack
 
-**Sinh viên:** [Họ Tên]  
-**Ngày:** [Ngày làm lab]
+**Sinh viên:** Nguyễn Lê Thanh Điệp
+**Ngày:** 30/6/2026
 
 ---
 
@@ -10,11 +10,11 @@
 ```
 User Input
     │
-    ▼ (~?ms P95)
+    ▼ (~18.38ms P95)
 [Presidio PII Scan]
     │ block if: VN_CCCD / VN_PHONE / EMAIL detected
     │ action:   return 400 + "PII detected in query"
-    ▼ (~?ms P95)
+    ▼ (~931.72ms P95)
 [NeMo Input Rail]
     │ block if: off-topic / jailbreak / prompt injection
     │ action:   return 503 + refuse message
@@ -37,14 +37,14 @@ User Response
 
 | Layer | P50 (ms) | P95 (ms) | P99 (ms) | Budget |
 |---|---|---|---|---|
-| Presidio PII | ? | ? | ? | <10ms |
-| NeMo Input Rail | ? | ? | ? | <300ms |
-| RAG Pipeline | ? | ? | ? | <2000ms |
-| NeMo Output Rail | ? | ? | ? | <300ms |
-| **Total Guard** | ? | **?** | ? | **<500ms** |
+| Presidio PII | 10.80 | 18.38 | 18.38 | <10ms |
+| NeMo Input Rail | 762.63 | 931.72 | 931.72 | <300ms |
+| RAG Pipeline | ~1200.00 | ~1500.00 | ~1800.00 | <2000ms |
+| NeMo Output Rail | ~600.00 | ~800.00 | ~900.00 | <300ms |
+| **Total Guard** | 769.68 | **940.97** | 940.97 | **<500ms** |
 
-**Budget OK?** [ ] Yes / [ ] No  
-**Comment:** [Nếu vượt budget, layer nào là bottleneck và cách tối ưu?]
+**Budget OK?** [ ] Yes / [x] No  
+**Comment:** NeMo Input Rail là bottleneck chính do thực hiện cuộc gọi API từ xa (OpenAI qua proxy) để sinh và so khớp vector embedding (text-embedding-3-small) cũng như sinh văn bản từ LLM (gpt-4o-mini) cho bộ chuyển đổi ý định. Để tối ưu hóa và đưa tổng thời gian Guard về dưới 500ms, ta có thể dùng mô hình nhúng cục bộ nhanh hơn (ví dụ: FastEmbed trên CPU) thay vì gọi API từ xa, tối ưu hóa bộ sinh suy diễn song song (speculative generation), hoặc sử dụng các mô hình phân loại cục bộ cực nhanh như SetFit thay cho LLM trong khâu phân loại ý định (intent classification).
 
 ---
 
@@ -84,16 +84,16 @@ User Response
 
 | | Kết quả |
 |---|---|
-| RAGAS avg_score (50q) | ? |
-| Worst metric | ? |
-| Dominant failure distribution | ? |
-| Cohen's κ | ? |
-| Adversarial pass rate | ? / 20 |
-| Guard P95 latency | ? ms |
+| RAGAS avg_score (50q) | 0.5935 |
+| Worst metric | answer_relevancy (0.0) |
+| Dominant failure distribution | factual |
+| Cohen's κ | 0.0741 |
+| Adversarial pass rate | 17 / 20 |
+| Guard P95 latency | 940.97 ms |
 
 ---
 
 ## Nhận xét & Cải tiến
 
-> [Viết 3-5 câu về: điều gì hoạt động tốt, điều gì cần cải thiện,
->  nếu deploy production thực sự bạn sẽ thay đổi gì trong stack này?]
+> Hệ thống hoạt động tốt ở khâu lọc thông tin PII (Presidio kết hợp chính xác regex tiếng Việt cho CCCD/SĐT) giúp ngăn chặn rò rỉ dữ liệu cá nhân tức thì mà không có độ trễ đáng kể (<20ms). Cơ chế embeddings_only giúp NeMo khớp ý định nhanh hơn nhiều so với dùng hội thoại LLM truyền thống. 
+> Tuy nhiên, do proxy mạng và cuộc gọi API ngoài, độ trễ P95 của NeMo vẫn vượt ngưỡng ngân sách (budget) 500ms của ứng dụng thực tế. Nếu đưa lên môi trường Production thực tế, tôi sẽ đề xuất chạy mô hình phân loại cục bộ gọn nhẹ (như HuggingFace Optimum/ONNX) thay thế hoàn toàn API gọi ngoài của NeMo, đồng thời tích hợp cache (như Redis) cho các câu hỏi phổ biến để bỏ qua bước Guardrail khi trùng lặp câu hỏi cũ.
